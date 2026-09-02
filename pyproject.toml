@@ -13,7 +13,7 @@ authors = [{name = "Rafael GG"}]
 
 [project.scripts]
 raev-guard = "raev_guard.cli:main"
+raev-guard-dashboard = "raev_guard.dashboard:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
