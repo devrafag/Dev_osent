@@ -44,6 +44,8 @@ def generate(seed: int = 42, normal_events: int = 500) -> Scenario:
         "203.0.113.11": "USER_ENUMERATION",
         "203.0.113.12": "SENSITIVE_PATH_PROBE",
         "203.0.113.13": "OFF_HOURS_ADMIN",
+        "203.0.113.14": "SLOW_BRUTE_FORCE",
+        "203.0.113.15": "OBFUSCATED_SENSITIVE_PATH",
     }
     for second in range(6):
         events.append(Event(base + timedelta(hours=1, seconds=second * 20),
@@ -55,6 +57,13 @@ def generate(seed: int = 42, normal_events: int = 500) -> Scenario:
                         "nobody", "FAIL", "/.env"))
     events.append(Event(base.replace(hour=3), "203.0.113.13",
                         "admin", "FAIL", "/wp-admin"))
+    # Ocho intentos espaciados: evita la regla rápida, pero no la de 24 horas.
+    for index in range(8):
+        events.append(Event(base + timedelta(minutes=index * 22),
+                            "203.0.113.14", "admin", "FAIL", "/login"))
+    # Una consulta intenta ocultar la ruta sensible con parámetros.
+    events.append(Event(base + timedelta(hours=4), "203.0.113.15",
+                        "nobody", "FAIL", "/.env?cache=93817"))
     events.sort(key=lambda event: event.timestamp)
     return Scenario(events, set(attacks), attacks)
 
@@ -98,4 +107,3 @@ def render_benchmark(scenario: Scenario, alerts: list[Alert], score: Score) -> s
         f"Cobertura (recall):   {score.recall:.1%}",
     ]
     return "\n".join(lines)
-
