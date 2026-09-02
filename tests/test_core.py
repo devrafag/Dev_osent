@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta
 from raev_guard.core import Alert, Config, Event, analyze, parse_text
 from raev_guard.simulator import evaluate, generate, run
+from raev_guard.dashboard import simulation_payload
 
 class ParserTests(unittest.TestCase):
     def test_valid_line(self):
@@ -71,6 +72,16 @@ class SimulatorTests(unittest.TestCase):
         extra = Alert("HIGH", "TEST", "10.0.0.1", "prueba", "a", "b", 1)
         score = evaluate(scenario, analyze(scenario.events) + [extra])
         self.assertEqual(score.false_positives, 1)
+
+    def test_dashboard_payload_matches_simulation(self):
+        payload = simulation_payload(seed=42, normal_events=500)
+        self.assertEqual(payload["attacks"], 14)
+        self.assertEqual(payload["tp"], 14)
+        self.assertEqual(payload["fn"], 0)
+
+    def test_dashboard_rejects_excessive_volume(self):
+        with self.assertRaises(ValueError):
+            simulation_payload(seed=42, normal_events=100_001)
 
 if __name__ == "__main__":
     unittest.main()
