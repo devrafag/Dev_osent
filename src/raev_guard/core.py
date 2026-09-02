@@ -28,6 +28,8 @@ class Config:
     failed_threshold: int = 5
     window_minutes: int = 10
     distinct_users_threshold: int = 3
+    slow_failed_threshold: int = 8
+    slow_window_hours: int = 24
     unusual_start_hour: int = 0
     unusual_end_hour: int = 6
     admin_paths: tuple[str, ...] = ("/admin", "/wp-admin", "/panel")
@@ -84,17 +86,42 @@ def analyze(events: list[Event], config: Config | None = None) -> list[Alert]:
             if len(window) == cfg.failed_threshold:
                 alerts.append(_alert("HIGH", "BRUTE_FORCE", ip,
                     f"{len(window)} fallos en {cfg.window_minutes} minutos", window))
-        users = {event.username for event in failures}
-        if len(users) >= cfg.distinct_users_threshold:
-            alerts.append(_alert("MEDIUM", "USER_ENUMERATION", ip,
-                f"Probó {len(users)} usuarios distintos: {', '.join(sorted(users))}", failures))
+        # Segundo horizonte: descubre ataques deliberadamente lentos.
+        failures_by_user: dict[str, list[Event]] = defaultdict(list)
+        for failure in failures:
+            failures_by_user[failure.username].append(failure)
+        for username, user_failures in failures_by_user.items():
+            left = 0
+            for right, event in enumerate(user_failures):
+                while event.timestamp - user_failures[left].timestamp > timedelta(
+                        hours=cfg.slow_window_hours):
+                    left += 1
+                slow_window = user_failures[left:right + 1]
+                if len(slow_window) == cfg.slow_failed_threshold:
+                    alerts.append(_alert("MEDIUM", "SLOW_BRUTE_FORCE", ip,
+                        f"{len(slow_window)} fallos para {username} en "
+                        f"{cfg.slow_window_hours} horas", slow_window))
+
+        # Enumeración exige usuarios distintos dentro de la ventana rápida.
+        for left, start in enumerate(failures):
+            window = [event for event in failures[left:]
+                      if event.timestamp - start.timestamp <= timedelta(
+                          minutes=cfg.window_minutes)]
+            users = {event.username for event in window}
+            if len(users) >= cfg.distinct_users_threshold:
+                alerts.append(_alert("MEDIUM", "USER_ENUMERATION", ip,
+                    f"Probó {len(users)} usuarios distintos en "
+                    f"{cfg.window_minutes} minutos", window))
+                break
         off_hour = [event for event in ip_events
                     if cfg.unusual_start_hour <= event.timestamp.hour < cfg.unusual_end_hour
                     and event.path.lower() in cfg.admin_paths]
         if off_hour:
             alerts.append(_alert("MEDIUM", "OFF_HOURS_ADMIN", ip,
                 "Acceso administrativo en horario inusual", off_hour))
-        risky = [event for event in ip_events if event.path.lower() in cfg.risky_paths]
+        # Ignora parámetros y fragmentos para que /.env?cache=123 siga siendo /.env.
+        risky = [event for event in ip_events
+                 if event.path.lower().split("?", 1)[0].split("#", 1)[0] in cfg.risky_paths]
         if risky:
             alerts.append(_alert("HIGH", "SENSITIVE_PATH_PROBE", ip,
                 f"Sondeo de ruta sensible: {risky[0].path}", risky))
@@ -131,4 +158,3 @@ def write_report(content: str, destination: str | None) -> None:
         Path(destination).write_text(content, encoding="utf-8")
     else:
         print(content)
-
