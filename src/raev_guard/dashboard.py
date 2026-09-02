@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlparse
 
+from .honeypot import clear_honeypot, honeypot_snapshot, simulate_honeypot
 from .lab import run_lab_scenario
 from .simulator import run
 
@@ -34,7 +35,7 @@ button{border:0;border-radius:5px;background:var(--green);color:#06120e;padding:
 <section class="metrics"><div class="card"><small>EVENTOS</small><strong id="total">—</strong></div><div class="card"><small>IP MALICIOSAS</small><strong id="attacks">—</strong></div><div class="card"><small>DETECTADAS</small><strong id="tp" class="good">—</strong></div><div class="card"><small>FALSAS ALARMAS</small><strong id="fp">—</strong></div><div class="card"><small>PRECISIÓN</small><strong id="precision">—</strong></div></section>
 <section class="grid"><div class="tablebox"><h2>Incidentes inyectados</h2><table><thead><tr><th>ESTADO</th><th>ATAQUE</th><th>IP</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="tablebox"><h2>Rendimiento</h2><small class="subtitle">COBERTURA</small><div class="bar"><i id="recallbar"></i></div><strong id="recall">—</strong><p class="note">La precisión baja cuando aparecen falsas alarmas. La cobertura baja cuando un ataque consigue pasar inadvertido.</p><p class="note" id="summary"></p></div></section>
-<footer><a href="/lab" style="color:#58e0b5">Abrir web vulnerable educativa →</a> · No realiza conexiones a objetivos externos · <form method="post" action="/logout" style="display:inline"><button style="padding:5px 8px;background:#202c34;color:#82919b">Cerrar sesión</button></form></footer>
+<footer><a href="/lab" style="color:#58e0b5">Web vulnerable</a> · <a href="/honeypot" style="color:#f3bc55">Honeypot privado</a> · No realiza conexiones externas · <form method="post" action="/logout" style="display:inline"><button style="padding:5px 8px;background:#202c34;color:#82919b">Cerrar sesión</button></form></footer>
 </main><script>
 async function simulate(){
  const app=document.getElementById("app"); app.classList.add("loading");
@@ -71,6 +72,23 @@ LAB_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta n
 </div><section id="result" class="result"><div class="tag" id="status"></div><h2 id="title"></h2><p id="evidence"></p><p><b>Regla:</b> <code id="rule"></code></p><p><b>Qué aprender:</b> <span id="lesson"></span></p><p><b>Corrección:</b> <span id="fix"></span></p></section>
 <script>async function test(scenario,id){const response=await fetch('/api/lab',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({scenario:scenario,value:document.getElementById(id).value})});const data=await response.json();if(!response.ok){alert(data.error||'Error');return}const box=document.getElementById('result');box.className='result show '+(data.detected?'detected':'safe');document.getElementById('status').textContent=data.detected?'AMENAZA DETECTADA':'SIN COINCIDENCIA';['title','evidence','rule','lesson','fix'].forEach(x=>document.getElementById(x).textContent=data[x]);box.scrollIntoView({behavior:'smooth'});}</script>
 </main></body></html>"""
+
+HONEYPOT_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>RAEV Guard — Honeypot privado</title><style>
+:root{--bg:#070a0d;--panel:#0e151b;--line:#26343e;--text:#e9f1f2;--muted:#84949e;--green:#52ddb0;--red:#ff6678;--amber:#f0bb55}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#392914 0,transparent 28%),var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:1100px;margin:auto;padding:26px 16px}a{color:var(--green)}h1{font:400 34px Georgia;margin:12px 0 5px}.sub{color:var(--muted);margin:0 0 18px}.notice{padding:12px;border:1px solid #5b4828;background:#221a0e;color:#f1ce8b;font-size:13px}.actions{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:16px 0}.actions button,.clear{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:12px 8px;border-radius:5px;font-weight:bold;cursor:pointer}.actions button:hover{border-color:var(--amber)}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:10px}.metric,.box{background:var(--panel);border:1px solid var(--line);padding:16px}.metric small{color:var(--muted);letter-spacing:.1em}.metric strong{display:block;font:30px Georgia;margin-top:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box h2{font:20px Georgia;margin:0 0 12px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{text-align:left;padding:8px 5px;border-bottom:1px solid #202c34}th{color:var(--muted);font-size:9px}.high{color:var(--red)}.medium{color:var(--amber)}.empty{color:var(--muted);font-size:12px}.toolbar{display:flex;justify-content:space-between;align-items:center;margin-top:12px}.clear{padding:8px 11px;color:var(--red)}@media(max-width:760px){.actions{grid-template-columns:1fr 1fr}.actions button:last-child{grid-column:1/-1}.grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style></head><body><main><a href="/">← Panel principal</a><h1>Honeypot privado</h1><p class="sub">Servicio señuelo de baja interacción para observar y clasificar intentos ficticios.</p><div class="notice">Laboratorio cerrado: usa IP ficticias, anonimiza las fuentes y nunca almacena contraseñas.</div>
+<section class="actions"><button onclick="attack('normal-visit')">Visita normal</button><button onclick="attack('brute-force')">Fuerza bruta</button><button onclick="attack('user-enumeration')">Enumerar usuarios</button><button onclick="attack('sensitive-scan')">Escanear rutas</button><button onclick="attack('slow-attack')">Ataque lento</button></section>
+<section class="metrics"><div class="metric"><small>EVENTOS</small><strong id="events">0</strong></div><div class="metric"><small>FUENTES ANÓNIMAS</small><strong id="sources">0</strong></div><div class="metric"><small>ALERTAS</small><strong id="alerts">0</strong></div></section>
+<section class="grid"><div class="box"><h2>Actividad capturada</h2><div id="eventbox" class="empty">Sin actividad.</div></div><div class="box"><h2>Detecciones de RAEV Guard</h2><div id="alertbox" class="empty">Sin alertas.</div></div></section><div class="toolbar"><span class="empty">Los datos desaparecen al reiniciarse el servicio.</span><button class="clear" onclick="clearAll()">Borrar registros</button></div>
+<script>
+function esc(v){return String(v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]})}
+async function request(path,method,body){const r=await fetch(path,{method:method||'GET',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});const d=await r.json();if(!r.ok)throw new Error(d.error||'Error');return d}
+function render(d){document.getElementById('events').textContent=d.event_count;document.getElementById('sources').textContent=d.sources;document.getElementById('alerts').textContent=d.alert_count;document.getElementById('eventbox').innerHTML=d.events.length?'<table><tr><th>HORA</th><th>FUENTE</th><th>USUARIO</th><th>RUTA</th></tr>'+d.events.map(x=>'<tr><td>'+esc(x.time)+'</td><td>'+esc(x.source)+'</td><td>'+esc(x.username)+'</td><td>'+esc(x.path)+'</td></tr>').join('')+'</table>':'Sin actividad.';document.getElementById('alertbox').innerHTML=d.alerts.length?'<table><tr><th>NIVEL</th><th>REGLA</th><th>FUENTE</th></tr>'+d.alerts.map(x=>'<tr><td class="'+esc(x.severity.toLowerCase())+'">'+esc(x.severity)+'</td><td>'+esc(x.rule)+'</td><td>'+esc(x.ip)+'</td></tr>').join('')+'</table>':'Sin alertas.'}
+async function attack(kind){try{render(await request('/api/honeypot/simulate','POST','scenario='+encodeURIComponent(kind)))}catch(e){alert(e.message)}}
+async function clearAll(){try{render(await request('/api/honeypot/clear','POST','confirm=yes'))}catch(e){alert(e.message)}}
+request('/api/honeypot').then(render).catch(e=>alert(e.message));
+</script></main></body></html>"""
 
 LOGIN_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width"><title>Acceso — RAEV Guard</title>
@@ -197,6 +215,13 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/lab":
             self._send(200, LAB_HTML.encode(), "text/html; charset=utf-8")
             return
+        if parsed.path == "/honeypot":
+            self._send(200, HONEYPOT_HTML.encode(), "text/html; charset=utf-8")
+            return
+        if parsed.path == "/api/honeypot":
+            body = json.dumps(honeypot_snapshot(), ensure_ascii=False).encode()
+            self._send(200, body, "application/json")
+            return
         if parsed.path == "/api/simulate":
             try:
                 query = parse_qs(parsed.query)
@@ -233,6 +258,24 @@ class Handler(BaseHTTPRequestHandler):
                 client_ip = self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
                 body = json.dumps(run_lab_scenario(scenario, value, client_ip),
                                   ensure_ascii=False, default=str).encode()
+                self._send(200, body, "application/json")
+            except (ValueError, TypeError) as exc:
+                self._send(400, json.dumps({"error": str(exc)}).encode(),
+                           "application/json")
+            return
+        if parsed.path in ("/api/honeypot/simulate", "/api/honeypot/clear"):
+            if not self._authenticated():
+                self._send(401, b'{"error":"authentication required"}',
+                           "application/json")
+                return
+            try:
+                length = min(int(self.headers.get("Content-Length", "0")), 1024)
+                form = parse_qs(self.rfile.read(length).decode(errors="replace"))
+                if parsed.path.endswith("/simulate"):
+                    payload = simulate_honeypot(form.get("scenario", [""])[0])
+                else:
+                    payload = clear_honeypot()
+                body = json.dumps(payload, ensure_ascii=False).encode()
                 self._send(200, body, "application/json")
             except (ValueError, TypeError) as exc:
                 self._send(400, json.dumps({"error": str(exc)}).encode(),
