@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from raev_guard.core import Alert, Config, Event, analyze, parse_text
 from raev_guard.simulator import evaluate, generate, run
 
@@ -46,13 +46,22 @@ class RuleTests(unittest.TestCase):
                         f"user{hour}", "FAIL", "/login") for hour in range(8)]
         self.assertNotIn("SLOW_BRUTE_FORCE", {a.rule for a in analyze(events)})
 
+    def test_distributed_attack_is_correlated_across_ips(self):
+        events = [Event(datetime(2026, 9, 2, 12) + timedelta(seconds=second * 20),
+                        f"198.51.100.{second}", "direccion", "FAIL", "/login")
+                  for second in range(6)]
+        distributed = [a for a in analyze(events)
+                       if a.rule == "DISTRIBUTED_CREDENTIAL_ATTACK"]
+        self.assertEqual({a.ip for a in distributed},
+                         {f"198.51.100.{second}" for second in range(6)})
+
 class SimulatorTests(unittest.TestCase):
     def test_same_seed_produces_same_events(self):
         self.assertEqual(generate(seed=7).events, generate(seed=7).events)
 
     def test_all_injected_attacks_are_detected(self):
         scenario, alerts, score = run(seed=42, normal_events=500)
-        self.assertEqual(score.true_positives, 6)
+        self.assertEqual(score.true_positives, 14)
         self.assertEqual(score.false_negatives, 0)
         self.assertEqual(score.precision, 1.0)
         self.assertEqual(score.recall, 1.0)
