@@ -2,7 +2,9 @@ import unittest
 from datetime import datetime, timedelta
 from raev_guard.core import Alert, Config, Event, analyze, parse_text
 from raev_guard.simulator import evaluate, generate, run
-from raev_guard.dashboard import simulation_payload
+from raev_guard.dashboard import (SESSION_SECONDS, create_session, login_allowed,
+                                  password_hash, simulation_payload,
+                                  verify_password, verify_session)
 
 class ParserTests(unittest.TestCase):
     def test_valid_line(self):
@@ -82,6 +84,24 @@ class SimulatorTests(unittest.TestCase):
     def test_dashboard_rejects_excessive_volume(self):
         with self.assertRaises(ValueError):
             simulation_payload(seed=42, normal_events=100_001)
+
+    def test_password_is_hashed_and_verified(self):
+        encoded = password_hash("correct horse battery staple", b"1234567890abcdef")
+        self.assertNotIn("correct horse", encoded)
+        self.assertTrue(verify_password("correct horse battery staple", encoded))
+        self.assertFalse(verify_password("incorrecta", encoded))
+
+    def test_signed_session_expires(self):
+        token = create_session("rafael", "secret-long-enough", now=1000)
+        self.assertTrue(verify_session(token, "rafael", "secret-long-enough",
+                                       now=1000 + SESSION_SECONDS))
+        self.assertFalse(verify_session(token, "rafael", "secret-long-enough",
+                                        now=1001 + SESSION_SECONDS))
+
+    def test_manipulated_session_is_rejected(self):
+        token = create_session("rafael", "secret-long-enough", now=1000)
+        self.assertFalse(verify_session(token + "x", "rafael",
+                                        "secret-long-enough", now=1001))
 
 if __name__ == "__main__":
     unittest.main()
