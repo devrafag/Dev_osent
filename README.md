@@ -46,6 +46,7 @@ raev-guard examples/access.log --failed-threshold 8 --window-minutes 15
 | Regla | Nivel | Detección |
 |---|---|---|
 | BRUTE_FORCE | Alto | Ráfaga de fallos desde una IP |
+| SLOW_BRUTE_FORCE | Medio | Muchos fallos espaciados durante 24 horas |
 | USER_ENUMERATION | Medio | Una IP prueba múltiples usuarios |
 | OFF_HOURS_ADMIN | Medio | Acceso administrativo de madrugada |
 | SENSITIVE_PATH_PROBE | Alto | Petición a rutas como /.env |
@@ -60,14 +61,28 @@ etiquetados. Como conocemos la respuesta correcta de antemano, mide:
 - ataques no detectados;
 - precisión y cobertura.
 
-La simulación es reproducible: la misma semilla produce exactamente los mismos
-eventos.
+La simulación avanzada es reproducible y contiene fuerza bruta rápida y lenta,
+enumeración de usuarios, acceso fuera de horario y rutas sensibles camufladas
+con parámetros. Mezcla estos incidentes con cientos o miles de eventos normales.
 
 ~~~bash
 raev-guard --simulate
 raev-guard --simulate --seed 99 --normal-events 5000
 raev-guard --simulate --failed-threshold 8
 ~~~
+
+### Resultados de referencia
+
+| Tráfico normal | Ataques | Detectados | Falsos positivos | Precisión |
+|---:|---:|---:|---:|---:|
+| 500 | 6 | 6 | 0 | 100 % |
+| 10.000 | 6 | 6 | 0 | 100 % |
+| 50.000 | 6 | 6 | 10 | 37,5 % |
+
+La caída con 50.000 eventos muestra una limitación real: cuando muchas
+peticiones legítimas comparten pocas IP, los umbrales fijos generan ruido.
+Estos resultados son del laboratorio incluido y no equivalen a rendimiento
+garantizado sobre logs de producción.
 
 ## Pruebas
 
