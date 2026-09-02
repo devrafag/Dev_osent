@@ -17,6 +17,7 @@ Python 3.10 o posterior. No tiene dependencias externas.
 python -m venv .venv
 python -m pip install -e .
 raev-guard --demo
+raev-guard --simulate
 ~~~
 
 El código de salida es 1 cuando hay alertas y 0 cuando no encuentra ninguna.
@@ -49,6 +50,25 @@ raev-guard examples/access.log --failed-threshold 8 --window-minutes 15
 | OFF_HOURS_ADMIN | Medio | Acceso administrativo de madrugada |
 | SENSITIVE_PATH_PROBE | Alto | Petición a rutas como /.env |
 
+## Laboratorio simulado
+
+El simulador genera cientos de accesos normales e inyecta cuatro incidentes
+etiquetados. Como conocemos la respuesta correcta de antemano, mide:
+
+- verdaderos positivos;
+- falsos positivos;
+- ataques no detectados;
+- precisión y cobertura.
+
+La simulación es reproducible: la misma semilla produce exactamente los mismos
+eventos.
+
+~~~bash
+raev-guard --simulate
+raev-guard --simulate --seed 99 --normal-events 5000
+raev-guard --simulate --failed-threshold 8
+~~~
+
 ## Pruebas
 
 ~~~bash
@@ -57,4 +77,3 @@ python -m unittest discover -s tests -v
 
 La versión 1.0 usa un formato educativo normalizado. El siguiente paso puede
 añadir adaptadores para Nginx, Apache, SSH y aplicaciones web.
-
