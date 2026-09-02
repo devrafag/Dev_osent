@@ -50,6 +50,7 @@ raev-guard examples/access.log --failed-threshold 8 --window-minutes 15
 | USER_ENUMERATION | Medio | Una IP prueba múltiples usuarios |
 | OFF_HOURS_ADMIN | Medio | Acceso administrativo de madrugada |
 | SENSITIVE_PATH_PROBE | Alto | Petición a rutas como /.env |
+| DISTRIBUTED_CREDENTIAL_ATTACK | Alto | Muchas IP atacan una cuenta en pocos minutos |
 
 ## Laboratorio simulado
 
@@ -62,8 +63,8 @@ etiquetados. Como conocemos la respuesta correcta de antemano, mide:
 - precisión y cobertura.
 
 La simulación avanzada es reproducible y contiene fuerza bruta rápida y lenta,
-enumeración de usuarios, acceso fuera de horario y rutas sensibles camufladas
-con parámetros. Mezcla estos incidentes con cientos o miles de eventos normales.
+enumeración de usuarios, acceso fuera de horario, rutas camufladas y un ataque
+distribuido donde ocho IP hacen un solo intento contra la misma cuenta.
 
 ~~~bash
 raev-guard --simulate
@@ -73,11 +74,11 @@ raev-guard --simulate --failed-threshold 8
 
 ### Resultados de referencia
 
-| Tráfico normal | Ataques | Detectados | Falsos positivos | Precisión |
+| Tráfico normal | IP maliciosas | Detectadas | Falsos positivos | Precisión |
 |---:|---:|---:|---:|---:|
-| 500 | 6 | 6 | 0 | 100 % |
-| 10.000 | 6 | 6 | 0 | 100 % |
-| 50.000 | 6 | 6 | 10 | 37,5 % |
+| 500 | 14 | 14 | 0 | 100 % |
+| 10.000 | 14 | 14 | 0 | 100 % |
+| 50.000 | 14 | 14 | 10 | 58,3 % |
 
 La caída con 50.000 eventos muestra una limitación real: cuando muchas
 peticiones legítimas comparten pocas IP, los umbrales fijos generan ruido.
