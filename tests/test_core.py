@@ -1,6 +1,7 @@
 import unittest
 from datetime import datetime
-from raev_guard.core import Config, Event, analyze, parse_text
+from raev_guard.core import Alert, Config, Event, analyze, parse_text
+from raev_guard.simulator import evaluate, generate, run
 
 class ParserTests(unittest.TestCase):
     def test_valid_line(self):
@@ -28,6 +29,22 @@ class RuleTests(unittest.TestCase):
         event = Event(datetime(2026, 9, 2, 12), "1.2.3.4", "x", "FAIL", "/.env")
         self.assertIn("SENSITIVE_PATH_PROBE", {a.rule for a in analyze([event])})
 
+class SimulatorTests(unittest.TestCase):
+    def test_same_seed_produces_same_events(self):
+        self.assertEqual(generate(seed=7).events, generate(seed=7).events)
+
+    def test_all_injected_attacks_are_detected(self):
+        scenario, alerts, score = run(seed=42, normal_events=500)
+        self.assertEqual(score.true_positives, 4)
+        self.assertEqual(score.false_negatives, 0)
+        self.assertEqual(score.precision, 1.0)
+        self.assertEqual(score.recall, 1.0)
+
+    def test_evaluation_counts_false_positive(self):
+        scenario = generate(normal_events=0)
+        extra = Alert("HIGH", "TEST", "10.0.0.1", "prueba", "a", "b", 1)
+        score = evaluate(scenario, analyze(scenario.events) + [extra])
+        self.assertEqual(score.false_positives, 1)
+
 if __name__ == "__main__":
     unittest.main()
-
