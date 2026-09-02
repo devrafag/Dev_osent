@@ -85,6 +85,19 @@ peticiones legítimas comparten pocas IP, los umbrales fijos generan ruido.
 Estos resultados son del laboratorio incluido y no equivalen a rendimiento
 garantizado sobre logs de producción.
 
+## Panel gráfico
+
+El panel usa exactamente el mismo motor de detección y funciona localmente, sin
+enviar registros a internet ni instalar dependencias adicionales.
+
+~~~bash
+raev-guard-dashboard
+~~~
+
+Después abre http://127.0.0.1:8080. Desde el panel puedes cambiar la semilla y
+el volumen, ejecutar el análisis y consultar incidentes, precisión, cobertura y
+falsas alarmas.
+
 ## Pruebas
 
 ~~~bash
