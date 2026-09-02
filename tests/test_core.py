@@ -29,13 +29,30 @@ class RuleTests(unittest.TestCase):
         event = Event(datetime(2026, 9, 2, 12), "1.2.3.4", "x", "FAIL", "/.env")
         self.assertIn("SENSITIVE_PATH_PROBE", {a.rule for a in analyze([event])})
 
+    def test_sensitive_path_with_query_string(self):
+        event = Event(datetime(2026, 9, 2, 12), "1.2.3.4", "x", "FAIL",
+                      "/.env?cache=123")
+        self.assertIn("SENSITIVE_PATH_PROBE", {a.rule for a in analyze([event])})
+
+    def test_slow_brute_force(self):
+        events = [Event(datetime(2026, 9, 2, 8 + hour // 3, (hour % 3) * 20),
+                        "1.2.3.4", "admin", "FAIL", "/login") for hour in range(8)]
+        rules = {a.rule for a in analyze(events)}
+        self.assertIn("SLOW_BRUTE_FORCE", rules)
+        self.assertNotIn("BRUTE_FORCE", rules)
+
+    def test_unrelated_daily_failures_do_not_trigger_slow_rule(self):
+        events = [Event(datetime(2026, 9, 2, 8 + hour), "1.2.3.4",
+                        f"user{hour}", "FAIL", "/login") for hour in range(8)]
+        self.assertNotIn("SLOW_BRUTE_FORCE", {a.rule for a in analyze(events)})
+
 class SimulatorTests(unittest.TestCase):
     def test_same_seed_produces_same_events(self):
         self.assertEqual(generate(seed=7).events, generate(seed=7).events)
 
     def test_all_injected_attacks_are_detected(self):
         scenario, alerts, score = run(seed=42, normal_events=500)
-        self.assertEqual(score.true_positives, 4)
+        self.assertEqual(score.true_positives, 6)
         self.assertEqual(score.false_negatives, 0)
         self.assertEqual(score.precision, 1.0)
         self.assertEqual(score.recall, 1.0)
