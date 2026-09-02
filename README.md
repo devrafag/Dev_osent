@@ -98,6 +98,25 @@ Después abre http://127.0.0.1:8080. Desde el panel puedes cambiar la semilla y
 el volumen, ejecutar el análisis y consultar incidentes, precisión, cobertura y
 falsas alarmas.
 
+### Login seguro
+
+El panel y su API requieren autenticación. Primero genera un hash:
+
+~~~bash
+raev-guard-dashboard --generate-password-hash "TU CONTRASEÑA"
+~~~
+
+Configura estas variables sin escribir sus valores en GitHub:
+
+~~~text
+RAEV_USERNAME=tu_usuario
+RAEV_PASSWORD_HASH=el_hash_generado
+RAEV_SESSION_SECRET=una_cadena_aleatoria_larga
+~~~
+
+En Render se añaden en Environment. La sesión firmada dura ocho horas, utiliza
+una cookie HttpOnly, Secure y SameSite, y el login limita los intentos fallidos.
+
 ## Pruebas
 
 ~~~bash
