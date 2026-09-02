@@ -98,6 +98,14 @@ Después abre http://127.0.0.1:8080. Desde el panel puedes cambiar la semilla y
 el volumen, ejecutar el análisis y consultar incidentes, precisión, cobertura y
 falsas alarmas.
 
+### Web vulnerable educativa
+
+El enlace **Abrir web vulnerable educativa** conduce a cuatro prácticas
+controladas: contraseña débil, fuerza bruta, patrón de inyección SQL y patrón
+XSS. Son simulaciones seguras: las entradas se tratan como texto, no existe una
+base de datos atacable, no se ejecuta código recibido y no se envía tráfico a
+objetivos externos. Cada práctica explica la detección y la corrección adecuada.
+
 ### Login seguro
 
 El panel y su API requieren autenticación. Primero genera un hash:
