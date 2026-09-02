@@ -18,17 +18,33 @@ def parser() -> argparse.ArgumentParser:
     source = app.add_mutually_exclusive_group(required=False)
     source.add_argument("file", nargs="?", help="archivo de logs; usa - para stdin")
     source.add_argument("--demo", action="store_true", help="ejecuta datos de demostración")
+    source.add_argument("--simulate", action="store_true",
+                        help="genera tráfico etiquetado y mide la detección")
     app.add_argument("--format", choices=("text", "json", "csv"), default="text")
     app.add_argument("--output", "-o", help="guarda el informe en un archivo")
     app.add_argument("--failed-threshold", type=int, default=5)
     app.add_argument("--window-minutes", type=int, default=10)
     app.add_argument("--strict", action="store_true")
+    app.add_argument("--seed", type=int, default=42,
+                     help="semilla reproducible para la simulación")
+    app.add_argument("--normal-events", type=int, default=500,
+                     help="cantidad de eventos normales simulados")
     return app
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     if args.failed_threshold < 1 or args.window_minutes < 1:
         parser().error("los umbrales deben ser mayores que cero")
+    if args.simulate:
+        from .simulator import render_benchmark, run
+        scenario, alerts, score = run(
+            seed=args.seed,
+            normal_events=args.normal_events,
+            config=Config(failed_threshold=args.failed_threshold,
+                          window_minutes=args.window_minutes),
+        )
+        write_report(render_benchmark(scenario, alerts, score), args.output)
+        return 1 if score.false_negatives else 0
     if args.demo:
         source = DEMO
     elif args.file == "-":
@@ -56,4 +72,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
