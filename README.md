@@ -117,6 +117,17 @@ RAEV_SESSION_SECRET=una_cadena_aleatoria_larga
 En Render se añaden en Environment. La sesión firmada dura ocho horas, utiliza
 una cookie HttpOnly, Secure y SameSite, y el login limita los intentos fallidos.
 
+## Despliegue gratuito en Render
+
+El archivo render.yaml configura automáticamente el servicio web:
+
+1. Crea un Blueprint nuevo desde este repositorio.
+2. Introduce RAEV_USERNAME y RAEV_PASSWORD_HASH cuando Render los solicite.
+3. Render genera RAEV_SESSION_SECRET y activa las cookies HTTPS.
+
+El servicio gratuito se suspende tras un periodo sin visitas y puede tardar
+aproximadamente un minuto en despertar.
+
 ## Pruebas
 
 ~~~bash
