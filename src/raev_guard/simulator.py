@@ -64,6 +64,12 @@ def generate(seed: int = 42, normal_events: int = 500) -> Scenario:
     # Una consulta intenta ocultar la ruta sensible con parámetros.
     events.append(Event(base + timedelta(hours=4), "203.0.113.15",
                         "nobody", "FAIL", "/.env?cache=93817"))
+    # Ataque distribuido: cada IP solo hace un intento contra la misma cuenta.
+    for index in range(8):
+        ip = f"198.51.100.{100 + index}"
+        attacks[ip] = "DISTRIBUTED_CREDENTIAL_ATTACK"
+        events.append(Event(base + timedelta(hours=5, seconds=index * 35),
+                            ip, "direccion", "FAIL", "/login"))
     events.sort(key=lambda event: event.timestamp)
     return Scenario(events, set(attacks), attacks)
 
