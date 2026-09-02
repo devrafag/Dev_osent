@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlparse
 
+from .lab import run_lab_scenario
 from .simulator import run
 
 
@@ -33,7 +34,7 @@ button{border:0;border-radius:5px;background:var(--green);color:#06120e;padding:
 <section class="metrics"><div class="card"><small>EVENTOS</small><strong id="total">—</strong></div><div class="card"><small>IP MALICIOSAS</small><strong id="attacks">—</strong></div><div class="card"><small>DETECTADAS</small><strong id="tp" class="good">—</strong></div><div class="card"><small>FALSAS ALARMAS</small><strong id="fp">—</strong></div><div class="card"><small>PRECISIÓN</small><strong id="precision">—</strong></div></section>
 <section class="grid"><div class="tablebox"><h2>Incidentes inyectados</h2><table><thead><tr><th>ESTADO</th><th>ATAQUE</th><th>IP</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="tablebox"><h2>Rendimiento</h2><small class="subtitle">COBERTURA</small><div class="bar"><i id="recallbar"></i></div><strong id="recall">—</strong><p class="note">La precisión baja cuando aparecen falsas alarmas. La cobertura baja cuando un ataque consigue pasar inadvertido.</p><p class="note" id="summary"></p></div></section>
-<footer>Laboratorio local · No realiza conexiones a objetivos externos · <form method="post" action="/logout" style="display:inline"><button style="padding:5px 8px;background:#202c34;color:#82919b">Cerrar sesión</button></form></footer>
+<footer><a href="/lab" style="color:#58e0b5">Abrir web vulnerable educativa →</a> · No realiza conexiones a objetivos externos · <form method="post" action="/logout" style="display:inline"><button style="padding:5px 8px;background:#202c34;color:#82919b">Cerrar sesión</button></form></footer>
 </main><script>
 async function simulate(){
  const app=document.getElementById("app"); app.classList.add("loading");
@@ -55,6 +56,21 @@ async function simulate(){
 }
 simulate();
 </script></main></body></html>"""
+
+LAB_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>RAEV Guard — Web vulnerable educativa</title><style>
+:root{--bg:#080c10;--panel:#111820;--line:#26323d;--text:#edf4f5;--muted:#82919b;--green:#58e0b5;--red:#ff6577;--amber:#f3bc55}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0,#351824 0,transparent 30%),var(--bg);color:var(--text);font-family:Arial,sans-serif}main{max-width:980px;margin:auto;padding:30px 18px}a{color:var(--green)}h1{font:400 34px Georgia;margin:12px 0}p{color:var(--muted);line-height:1.55}.warning{border:1px solid #69404a;background:#26141a;padding:12px;color:#ffadb7;font-size:12px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:18px}.card,.result{background:var(--panel);border:1px solid var(--line);padding:20px}.card h2{font:400 20px Georgia;margin-top:0}.card small{color:var(--amber)}input{width:100%;background:#090f14;border:1px solid var(--line);color:var(--text);padding:12px;margin:10px 0}button{background:var(--green);border:0;border-radius:4px;padding:11px 14px;font-weight:bold;cursor:pointer}.result{display:none;margin-top:14px}.result.show{display:block}.detected{border-color:var(--red)}.safe{border-color:var(--green)}.tag{font-size:10px;letter-spacing:.12em;color:var(--green)}code{color:#ffadb7;word-break:break-word}@media(max-width:700px){.grid{grid-template-columns:1fr}h1{font-size:28px}}
+</style></head><body><main><a href="/">← Panel principal</a><div class="tag">RAEV GUARD / SAFE CYBER RANGE</div><h1>Web vulnerable educativa</h1>
+<p class="warning">Entorno simulado: no contiene una base de datos real, no ejecuta código introducido y no envía tráfico a otras webs.</p>
+<div class="grid">
+<section class="card"><small>FALLO 01</small><h2>Contraseña débil</h2><p>Prueba una contraseña predecible, por ejemplo <code>admin123</code>.</p><input id="weak" value="admin123" maxlength="512"><button onclick="test('weak-password','weak')">Probar defensa</button></section>
+<section class="card"><small>FALLO 02</small><h2>Fuerza bruta</h2><p>Genera cinco accesos fallidos ficticios contra la cuenta admin.</p><input id="brute" value="5 intentos controlados" disabled><button onclick="test('brute-force','brute')">Simular intentos</button></section>
+<section class="card"><small>FALLO 03</small><h2>Inyección SQL</h2><p>Ejemplo seguro: <code>' OR '1'='1</code>. Solo se analizará como texto.</p><input id="sql" value="' OR '1'='1" maxlength="512"><button onclick="test('sql-injection','sql')">Analizar entrada</button></section>
+<section class="card"><small>FALLO 04</small><h2>XSS</h2><p>Ejemplo seguro: una etiqueta script. Nunca se inserta como HTML.</p><input id="xss" value="&lt;script&gt;alert('demo')&lt;/script&gt;" maxlength="512"><button onclick="test('xss','xss')">Analizar comentario</button></section>
+</div><section id="result" class="result"><div class="tag" id="status"></div><h2 id="title"></h2><p id="evidence"></p><p><b>Regla:</b> <code id="rule"></code></p><p><b>Qué aprender:</b> <span id="lesson"></span></p><p><b>Corrección:</b> <span id="fix"></span></p></section>
+<script>async function test(scenario,id){const response=await fetch('/api/lab',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({scenario:scenario,value:document.getElementById(id).value})});const data=await response.json();if(!response.ok){alert(data.error||'Error');return}const box=document.getElementById('result');box.className='result show '+(data.detected?'detected':'safe');document.getElementById('status').textContent=data.detected?'AMENAZA DETECTADA':'SIN COINCIDENCIA';['title','evidence','rule','lesson','fix'].forEach(x=>document.getElementById(x).textContent=data[x]);box.scrollIntoView({behavior:'smooth'});}</script>
+</main></body></html>"""
 
 LOGIN_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width"><title>Acceso — RAEV Guard</title>
@@ -178,6 +194,9 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/":
             self._send(200, HTML.encode(), "text/html; charset=utf-8")
             return
+        if parsed.path == "/lab":
+            self._send(200, LAB_HTML.encode(), "text/html; charset=utf-8")
+            return
         if parsed.path == "/api/simulate":
             try:
                 query = parse_qs(parsed.query)
@@ -200,6 +219,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Set-Cookie",
                              f"{SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
             self.end_headers()
+            return
+        if parsed.path == "/api/lab":
+            if not self._authenticated():
+                self._send(401, b'{"error":"authentication required"}',
+                           "application/json")
+                return
+            try:
+                length = min(int(self.headers.get("Content-Length", "0")), 2048)
+                form = parse_qs(self.rfile.read(length).decode(errors="replace"))
+                scenario = form.get("scenario", [""])[0]
+                value = form.get("value", [""])[0]
+                client_ip = self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
+                body = json.dumps(run_lab_scenario(scenario, value, client_ip),
+                                  ensure_ascii=False, default=str).encode()
+                self._send(200, body, "application/json")
+            except (ValueError, TypeError) as exc:
+                self._send(400, json.dumps({"error": str(exc)}).encode(),
+                           "application/json")
             return
         if parsed.path != "/login":
             self._send(404, b"Not found", "text/plain")
