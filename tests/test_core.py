@@ -6,6 +6,8 @@ from raev_guard.dashboard import (SESSION_SECONDS, create_session, login_allowed
                                   password_hash, simulation_payload,
                                   verify_password, verify_session)
 from raev_guard.lab import run_lab_scenario
+from raev_guard.honeypot import (clear_honeypot, honeypot_snapshot,
+                                 simulate_honeypot)
 
 class ParserTests(unittest.TestCase):
     def test_valid_line(self):
@@ -125,6 +127,31 @@ class SafeLabTests(unittest.TestCase):
     def test_unknown_scenario_is_rejected(self):
         with self.assertRaises(ValueError):
             run_lab_scenario("remote-target", "https://example.com")
+
+class HoneypotTests(unittest.TestCase):
+    def setUp(self):
+        clear_honeypot()
+
+    def test_brute_force_creates_alert_without_full_ip(self):
+        result = simulate_honeypot("brute-force")
+        self.assertGreater(result["alert_count"], 0)
+        self.assertIn("BRUTE_FORCE", {item["rule"] for item in result["alerts"]})
+        self.assertTrue(all(item["source"].startswith("src-")
+                            for item in result["events"]))
+        self.assertFalse(result["stores_full_ips"])
+
+    def test_normal_visit_does_not_create_alert(self):
+        result = simulate_honeypot("normal-visit")
+        self.assertEqual(result["alert_count"], 0)
+
+    def test_clear_removes_all_events(self):
+        simulate_honeypot("sensitive-scan")
+        result = clear_honeypot()
+        self.assertEqual(result["event_count"], 0)
+
+    def test_unknown_honeypot_scenario_is_rejected(self):
+        with self.assertRaises(ValueError):
+            simulate_honeypot("real-target")
 
 if __name__ == "__main__":
     unittest.main()
