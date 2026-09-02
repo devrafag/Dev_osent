@@ -106,6 +106,14 @@ XSS. Son simulaciones seguras: las entradas se tratan como texto, no existe una
 base de datos atacable, no se ejecuta código recibido y no se envía tráfico a
 objetivos externos. Cada práctica explica la detección y la corrección adecuada.
 
+### Honeypot privado
+
+El panel incluye un honeypot educativo de baja interacción con cinco escenarios:
+visita normal, fuerza bruta, enumeración de usuarios, escaneo de rutas sensibles
+y ataque lento. Mantiene como máximo 250 eventos en memoria, no guarda
+contraseñas y sustituye cada IP ficticia por un identificador hash temporal.
+Los registros desaparecen al reiniciarse el servicio o al pulsar **Borrar**.
+
 ### Login seguro
 
 El panel y su API requieren autenticación. Primero genera un hash:
