@@ -30,6 +30,8 @@ class Config:
     distinct_users_threshold: int = 3
     slow_failed_threshold: int = 8
     slow_window_hours: int = 24
+    distributed_ip_threshold: int = 6
+    distributed_window_minutes: int = 10
     unusual_start_hour: int = 0
     unusual_end_hour: int = 6
     admin_paths: tuple[str, ...] = ("/admin", "/wp-admin", "/panel")
@@ -125,6 +127,32 @@ def analyze(events: list[Event], config: Config | None = None) -> list[Alert]:
         if risky:
             alerts.append(_alert("HIGH", "SENSITIVE_PATH_PROBE", ip,
                 f"Sondeo de ruta sensible: {risky[0].path}", risky))
+
+    # Correlación transversal: varias IP atacan el mismo usuario en poco tiempo.
+    failures_by_username: dict[str, list[Event]] = defaultdict(list)
+    for event in events:
+        if event.result == "FAIL":
+            failures_by_username[event.username].append(event)
+    distributed_ips_already_alerted: set[tuple[str, str]] = set()
+    for username, user_failures in failures_by_username.items():
+        left = 0
+        for right, event in enumerate(user_failures):
+            while event.timestamp - user_failures[left].timestamp > timedelta(
+                    minutes=cfg.distributed_window_minutes):
+                left += 1
+            window = user_failures[left:right + 1]
+            ips = {item.ip for item in window}
+            if len(ips) >= cfg.distributed_ip_threshold:
+                for attacker_ip in sorted(ips):
+                    key = (username, attacker_ip)
+                    if key in distributed_ips_already_alerted:
+                        continue
+                    evidence = [item for item in window if item.ip == attacker_ip]
+                    alerts.append(_alert(
+                        "HIGH", "DISTRIBUTED_CREDENTIAL_ATTACK", attacker_ip,
+                        f"{len(ips)} IP atacaron al usuario {username} en "
+                        f"{cfg.distributed_window_minutes} minutos", evidence))
+                    distributed_ips_already_alerted.add(key)
     rank = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
     return sorted(alerts, key=lambda item: (rank[item.severity], item.first_seen, item.ip))
 
