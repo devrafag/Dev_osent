@@ -5,6 +5,7 @@ from raev_guard.simulator import evaluate, generate, run
 from raev_guard.dashboard import (SESSION_SECONDS, create_session, login_allowed,
                                   password_hash, simulation_payload,
                                   verify_password, verify_session)
+from raev_guard.lab import run_lab_scenario
 
 class ParserTests(unittest.TestCase):
     def test_valid_line(self):
@@ -102,6 +103,28 @@ class SimulatorTests(unittest.TestCase):
         token = create_session("rafael", "secret-long-enough", now=1000)
         self.assertFalse(verify_session(token + "x", "rafael",
                                         "secret-long-enough", now=1001))
+
+class SafeLabTests(unittest.TestCase):
+    def test_sql_pattern_is_detected_without_execution(self):
+        result = run_lab_scenario("sql-injection", "' OR '1'='1")
+        self.assertTrue(result["detected"])
+        self.assertTrue(result["safe"])
+        self.assertEqual(result["rule"], "SQL_INJECTION_PATTERN")
+
+    def test_xss_input_remains_plain_data(self):
+        payload = "<script>alert('demo')</script>"
+        result = run_lab_scenario("xss", payload)
+        self.assertTrue(result["detected"])
+        self.assertNotIn(payload, str(result))
+
+    def test_brute_force_uses_real_detector(self):
+        result = run_lab_scenario("brute-force", "")
+        self.assertTrue(result["detected"])
+        self.assertEqual(result["rule"], "BRUTE_FORCE")
+
+    def test_unknown_scenario_is_rejected(self):
+        with self.assertRaises(ValueError):
+            run_lab_scenario("remote-target", "https://example.com")
 
 if __name__ == "__main__":
     unittest.main()
